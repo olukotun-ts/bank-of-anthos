@@ -171,6 +171,8 @@ jobs:
         type: string
     executor: gcp-cli/google
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
       - checkout
       - gcp-cli/initialize
       - run:
