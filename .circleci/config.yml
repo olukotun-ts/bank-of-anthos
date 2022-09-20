@@ -169,7 +169,7 @@ jobs:
     parameters:
       service:
         type: string
-    executor: base
+    executor: gcp-cli/default
     steps:
       - checkout
       - gcp-cli/initialize
