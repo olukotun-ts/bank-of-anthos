@@ -93,9 +93,9 @@ jobs:
             cp target/surefire-reports/*.xml test-reports
           # when: always  # Will this step run if test fails?
       - store_test_results:
-          path: test-reports
+          path: $SERVICE_DIR/test-reports
       - store_artifacts:
-          path: test-reports
+          path: $SERVICE_DIR/test-reports
   python-check-style:
     parameters:
       service:
@@ -151,8 +151,8 @@ jobs:
             # pytest –cov=src/ –cov-fail-under=100 tests/
             deactivate
       - store_test_results:
-          path: test-reports
+          path: $SERVICE_DIR/test-reports
       - store_artifacts:
-          path: test-reports
+          path: $SERVICE_DIR/test-reports
 
 
