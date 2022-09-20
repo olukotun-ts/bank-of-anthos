@@ -1,0 +1,156 @@
+version: 2.1
+
+executors:
+  base:
+    docker:
+      - image: cimg/deploy:2022.07
+  jdk17:
+    docker:
+      - image: cimg/openjdk:17.0.3
+    resource_class: xlarge
+  python38:
+    docker:
+      - image: cimg/python:3.8
+
+workflows:
+  build-and-test:
+    jobs:
+      - java-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: ["balancereader", "ledgerwriter", "transactionhistory"]
+      - java-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: ["balancereader", "ledgerwriter", "transactionhistory"]
+          requires:
+            - check-style-<<matrix.service>>
+      - python-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: ["contacts", "userservice"]
+      - python-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: ["contacts", "userservice"]
+          requires:
+            - check-style-<<matrix.service>>
+
+jobs:
+  java-check-style:
+    parameters:
+      service:
+        type: enum
+        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+    executor: jdk17
+    environment:
+      PROJECT_ROOT: "~/project"
+      SERVICE: <<parameters.service>>
+    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Check style
+          command: |
+            echo "Checking $SERVICE service"
+            $PROJECT_ROOT/mvnw checkstyle:check
+  java-unit-tests:
+    parameters:
+      service:
+        type: enum
+        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+    executor: jdk17
+    environment:
+      PROJECT_ROOT: "~/project"
+      SERVICE: <<parameters.service>>
+    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Create directory for test reports
+          command: mkdir test-reports
+      - run:
+          name: Run unit tests
+          command: |
+            echo "Running tests for $SERVICE service"
+            $PROJECT_ROOT/mvnw test
+      - run:
+          name: Generate code coverage report
+          command: |
+            echo "Checking $SERVICE service"
+            $PROJECT_ROOT/mvnw jacoco:report
+            echo "Coverage for $SERVICE service"
+            awk -F, \
+            '{ instructions += $4 + $5; covered += $5 } END \
+            { print covered, "/", instructions, " instructions covered"; \
+            print int(100*covered/instructions), "% covered" }' \
+            target/site/jacoco/jacoco.csv
+            cp target/surefire-reports/*.xml test-reports
+          # when: always  # Will this step run if test fails?
+      - store_test_results:
+          path: test-reports
+      - store_artifacts:
+          path: test-reports
+  python-check-style:
+    parameters:
+      service:
+        type: enum
+        enum: ["contacts", "userservice"]
+    executor: python38
+    environment:
+      PROJECT_ROOT: "~/project"
+      SERVICE: <<parameters.service>>
+    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Check style
+          command: |
+            pip install pylint
+            echo "Checking $SERVICE service"
+            pylint --rcfile=$PROJECT_ROOT/.pylintrc ./*/*.py
+  python-unit-tests:
+    parameters:
+      service:
+        type: enum
+        enum: ["contacts", "userservice"]
+    executor: python38
+    environment:
+      PROJECT_ROOT: "~/project"
+      SERVICE: <<parameters.service>>
+    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Create directory for test reports
+          command: mkdir test-reports
+      - run:
+          name: Run unit tests
+          command: |
+            echo "Running tests for $SERVICE service"
+            python3 -m venv venv-$SERVICE
+            source venv-$SERVICE/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            python -m pytest --junit-xml=test-reports/report-${SERVICE}.xml -v -p no:warnings
+            deactivate
+      - run:
+          name: Generate code coverage report
+          command: |
+            echo "Checking $SERVICE service"
+            python3 -m venv venv-$SERVICE
+            source venv-$SERVICE/bin/activate
+            python -m pytest --collect-only --cov-report=html:"test-reports/coverage-report.html" --cov=./ tests
+            # https://breadcrumbscollector.tech/how-to-use-code-coverage-in-python-with-pytest/
+            # pytest –cov=src/ –cov-fail-under=100 tests/
+            deactivate
+      - store_test_results:
+          path: test-reports
+      - store_artifacts:
+          path: test-reports
+
+
