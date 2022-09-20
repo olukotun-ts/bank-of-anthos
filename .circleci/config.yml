@@ -179,7 +179,7 @@ jobs:
           name: Install skaffold
           command: |
             curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
-            install skaffold /usr/local/bin/
+            sudo install skaffold /usr/local/bin/
       - gcp-cli/install:
           version: "402.0.0"
       - gcp-cli/initialize
@@ -192,4 +192,3 @@ jobs:
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
             skaffold build --build-image=<<parameters.service>> --tag=latest
-            
