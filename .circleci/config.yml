@@ -48,16 +48,16 @@ jobs:
         enum: ["balancereader", "ledgerwriter", "transactionhistory"]
     executor: jdk17
     environment:
-      PROJECT_ROOT: "~/project"
       SERVICE: <<parameters.service>>
-    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Check style
           command: |
             echo "Checking $SERVICE service"
-            $PROJECT_ROOT/mvnw checkstyle:check
+            cd $SERVICE_DIR
+            ../../mvnw checkstyle:check
   java-unit-tests:
     parameters:
       service:
@@ -65,24 +65,25 @@ jobs:
         enum: ["balancereader", "ledgerwriter", "transactionhistory"]
     executor: jdk17
     environment:
-      PROJECT_ROOT: "~/project"
       SERVICE: <<parameters.service>>
-    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Create directory for test reports
-          command: mkdir test-reports
+          command: mkdir $SERVICE_DIR/test-reports
       - run:
           name: Run unit tests
           command: |
             echo "Running tests for $SERVICE service"
-            $PROJECT_ROOT/mvnw test
+            cd $SERVICE_DIR
+            ../../mvnw test
       - run:
           name: Generate code coverage report
           command: |
             echo "Checking $SERVICE service"
-            $PROJECT_ROOT/mvnw jacoco:report
+            cd $SERVICE_DIR
+            ../../mvnw jacoco:report
             echo "Coverage for $SERVICE service"
             awk -F, \
             '{ instructions += $4 + $5; covered += $5 } END \
@@ -102,9 +103,8 @@ jobs:
         enum: ["contacts", "userservice"]
     executor: python38
     environment:
-      PROJECT_ROOT: "~/project"
       SERVICE: <<parameters.service>>
-    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
@@ -112,7 +112,7 @@ jobs:
           command: |
             pip install pylint
             echo "Checking $SERVICE service"
-            pylint --rcfile=$PROJECT_ROOT/.pylintrc ./*/*.py
+            pylint --rcfile=../../.pylintrc ./*/*.py
   python-unit-tests:
     parameters:
       service:
@@ -120,17 +120,17 @@ jobs:
         enum: ["contacts", "userservice"]
     executor: python38
     environment:
-      PROJECT_ROOT: "~/project"
       SERVICE: <<parameters.service>>
-    working_directory: $PROJECT_ROOT/src/<<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Create directory for test reports
-          command: mkdir test-reports
+          command: mkdir $SERVICE_DIR/test-reports
       - run:
           name: Run unit tests
           command: |
+            cd $SERVICE_DIR
             echo "Running tests for $SERVICE service"
             python3 -m venv venv-$SERVICE
             source venv-$SERVICE/bin/activate
@@ -141,6 +141,7 @@ jobs:
       - run:
           name: Generate code coverage report
           command: |
+            cd $SERVICE_DIR
             echo "Checking $SERVICE service"
             python3 -m venv venv-$SERVICE
             source venv-$SERVICE/bin/activate
