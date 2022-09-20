@@ -176,8 +176,8 @@ jobs:
       - run:
           name: Install skaffold
           command: |
-            gcloud components update
-            gcloud components install skaffold
+            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
+            install skaffold /usr/local/bin/
       - run:
           name: Build and deliver images
           command: |
