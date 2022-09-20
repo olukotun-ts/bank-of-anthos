@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   gcp-cli: circleci/gcp-cli@2.4.1
+  gcp-gcr: circleci/gcp-gcr@0.15.0
 
 executors:
   base:
@@ -182,17 +183,13 @@ jobs:
       - gcp-cli/install:
           version: "402.0.0"
       - gcp-cli/initialize
-      - run:
-          name: Authenticate to registry
-          command: |
-            gcloud auth configure-docker
+      - gcp-gcr/gcr-auth:
+          registry-url: us-west2-docker.pkg.dev
       - run:
           name: Build and deliver images
           command: |
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
-            skaffold build --build-image=<<parameters.service>> --tag=latest   
+            skaffold build --build-image=<<parameters.service>> --tag=latest
             
-skaffold build --build-image=balancereader --tag=$CIRCLE_SHA1    
-skaffold build --build-image=balancereader --tag=latest   
