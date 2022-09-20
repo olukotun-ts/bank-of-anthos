@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  gcp-cli: circleci/gcp-cli@2.4.1
+
 executors:
   base:
     docker:
@@ -13,7 +16,7 @@ executors:
       - image: cimg/python:3.8
 
 workflows:
-  build-and-test:
+  build-test-deliver:
     jobs:
       - java-check-style:
           name: check-style-<<matrix.service>>
@@ -39,6 +42,14 @@ workflows:
               service: ["contacts", "userservice"]
           requires:
             - check-style-<<matrix.service>>
+      - deliver-image:
+          name: deliver-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: ["contacts", "userservice", "balancereader", "ledgerwriter", "transactionhistory"]
+          requires:
+            - test-<<matrix.service>>
 
 jobs:
   java-check-style:
@@ -154,3 +165,19 @@ jobs:
           path: src/<<parameters.service>>/test-reports
       - store_artifacts:
           path: src/<<parameters.service>>/test-reports
+  deliver-image:
+    parameters:
+      service:
+        type: string
+    executor: base
+    steps:
+      - checkout
+      - gcp-cli/initialize
+      - run:
+          name: Build and deliver images
+          command: |
+            skaffold config set --global local-cluster false
+            skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
+            skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
+            skaffold build --build-image=<<parameters.service>> --tag=latest   
+            
