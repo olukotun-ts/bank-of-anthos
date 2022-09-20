@@ -110,6 +110,7 @@ jobs:
       - run:
           name: Check style
           command: |
+            cd $SERVICE_DIR
             pip install pylint
             echo "Checking $SERVICE service"
             pylint --rcfile=../../.pylintrc ./*/*.py
