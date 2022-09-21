@@ -48,16 +48,30 @@ workflows:
           context: cloudSecrets
           matrix:
             parameters:
-              service: ["contacts", "userservice", "balancereader", "ledgerwriter", "transactionhistory"]
+              service:
+                - balancereader
+                - contacts
+                - ledgerwriter
+                - transactionhistory
+                - userservice
           requires:
             - test-<<matrix.service>>
+      - deliver-image:
+          name: deliver-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service:
+                - accounts-db
+                - frontend
+                - ledger-db
+                - loadgenerator
 
 jobs:
   java-check-style:
     parameters:
       service:
-        type: enum
-        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+        type: string
     executor: jdk17
     environment:
       SERVICE: <<parameters.service>>
@@ -73,8 +87,7 @@ jobs:
   java-unit-tests:
     parameters:
       service:
-        type: enum
-        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+        type: string
     executor: jdk17
     environment:
       SERVICE: <<parameters.service>>
@@ -111,8 +124,7 @@ jobs:
   python-check-style:
     parameters:
       service:
-        type: enum
-        enum: ["contacts", "userservice"]
+        type: string
     executor: python38
     environment:
       SERVICE: <<parameters.service>>
@@ -129,8 +141,7 @@ jobs:
   python-unit-tests:
     parameters:
       service:
-        type: enum
-        enum: ["contacts", "userservice"]
+        type: string
     executor: python38
     environment:
       SERVICE: <<parameters.service>>
