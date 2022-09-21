@@ -26,7 +26,7 @@ jobs:
           name: Generate parameters
           command: python3 .circleci/generate-parameters.py
       - continuation/continue:
-          configuration_path: continue.yml
+          configuration_path: .circleci/continue.yml
           parameters: .circleci/pipeline-parameters.json
 
 workflows:
