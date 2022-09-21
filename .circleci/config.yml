@@ -15,12 +15,12 @@ jobs:
           base-revision: add-cci
           output-path: .circleci/filter-services.json
           mapping: |
-            src/balancereader/* balancereader true
-            src/contacts/* contacts true
-            src/ledgerwriter/* ledgerwriter true
-            src/transactionhistory/* transactionhistory true
-            src/userservice/* userservice true
-            ./* frontend true
+            src/balancereader/.* balancereader true
+            src/contacts/.* contacts true
+            src/ledgerwriter/.* ledgerwriter true
+            src/transactionhistory/.* transactionhistory true
+            src/userservice/.* userservice true
+            .circleci/.* frontend true
       - run:
           name: Generate parameters
           command: python3 .circleci/generate-parameters.py
