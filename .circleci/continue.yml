@@ -22,7 +22,7 @@ parameters:
     default: false
   python-services:
     type: enum
-    defaul: false
+    default: false
   all-services:
     type: enum
     default: false
