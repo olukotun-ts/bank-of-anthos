@@ -7,11 +7,10 @@ orbs:
 executors:
   base:
     docker:
-      - image: cimg/deploy:2022.07
+      - image: cimg/base:stable
   jdk17:
     docker:
       - image: cimg/openjdk:17.0.3
-    resource_class: xlarge
   python38:
     docker:
       - image: cimg/python:3.8
@@ -56,9 +55,15 @@ workflows:
                 - userservice
           requires:
             - test-<<matrix.service>>
+      - await-tests:
+          requires:
+            - java-unit-tests
+            - python-unit-tests
       - deliver-image:
           name: deliver-<<matrix.service>>
           context: cloudSecrets
+          requires:
+            - await-tests
           matrix:
             parameters:
               service:
@@ -203,3 +208,9 @@ jobs:
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
             skaffold build --build-image=<<parameters.service>> --tag=latest
+  await-tests:
+    executor: base
+    steps:
+      - run:
+          name: Waiting for tests to complete
+          command: echo "Waiting for tests"
