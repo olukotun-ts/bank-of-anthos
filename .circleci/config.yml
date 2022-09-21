@@ -55,15 +55,15 @@ workflows:
                 - userservice
           requires:
             - test-<<matrix.service>>
-      - await-tests:
+      - wait:
           requires:
-            - java-unit-tests
-            - python-unit-tests
+            - java-check-style
+            - python-check-style
       - deliver-image:
           name: deliver-<<matrix.service>>
           context: cloudSecrets
           requires:
-            - await-tests
+            - wait
           matrix:
             parameters:
               service:
@@ -208,7 +208,7 @@ jobs:
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
             skaffold build --build-image=<<parameters.service>> --tag=latest
-  await-tests:
+  wait:
     executor: base
     steps:
       - run:
