@@ -1,0 +1,263 @@
+version: 2.1
+
+orbs:
+  gcp-cli: circleci/gcp-cli@2.4.1
+  gcp-gcr: circleci/gcp-gcr@0.15.0
+
+executors:
+  base:
+    docker:
+      - image: cimg/deploy:2022.07
+  jdk17:
+    docker:
+      - image: cimg/openjdk:17.0.3
+    resource_class: xlarge
+  python38:
+    docker:
+      - image: cimg/python:3.8
+
+parameters:
+  java-services:
+    type: enum
+    default: false
+  python-services:
+    type: enum
+    defaul: false
+  all-services:
+    type: enum
+    default: false
+
+workflows:
+  java-build-test:
+    when:
+      and:
+        - <<pipeline.parameters.java-services>>
+        - not:
+            equal: [main, <<pipeline.git.branch>>]
+    jobs:
+      - java-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.java-services>>
+      - java-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.java-services>>
+          requires:
+            - check-style-<<matrix.service>>
+      - build-image:
+          name: build-image-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.java-services>>
+          requires:
+            - test-<<matrix.service>>
+  python-build-test:
+    when:
+      and:
+        - <<pipeline.parameters.python-services>>
+        - not:
+            equal: [main, <<pipeline.git.branch>>]
+    jobs:
+      - python-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.python-services>>
+      - python-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.python-services>>
+          requires:
+            - check-style-<<matrix.service>>
+      - build-image:
+          name: build-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.python-services>>
+          requires:
+            - test-<<matrix.service>>
+  build-test-deliver:
+    when:
+      and:
+        - equal: [main, <<pipeline.git.branch>>]
+        - <<pipeline.parameters.all-services>>
+    jobs:
+      - java-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.java-services>>
+      - java-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.java-services>>
+          requires:
+            - check-style-<<matrix.service>>
+      - python-check-style:
+          name: check-style-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.python-services>>
+      - python-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: <<pipeline.parameters.python-services>>
+          requires:
+            - check-style-<<matrix.service>>
+      - deliver-image:
+          name: deliver-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: [<<pipeline.parameters.all-services>>]
+          requires:
+            - test-<<matrix.service>>
+
+jobs:
+  java-check-style:
+    parameters:
+      service:
+        type: enum
+        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+    executor: jdk17
+    environment:
+      SERVICE: <<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Check style
+          command: |
+            echo "Checking $SERVICE service"
+            cd $SERVICE_DIR
+            ../../mvnw checkstyle:check
+  java-unit-tests:
+    parameters:
+      service:
+        type: enum
+        enum: ["balancereader", "ledgerwriter", "transactionhistory"]
+    executor: jdk17
+    environment:
+      SERVICE: <<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Create directory for test reports
+          command: mkdir $SERVICE_DIR/test-reports
+      - run:
+          name: Run unit tests
+          command: |
+            echo "Running tests for $SERVICE service"
+            cd $SERVICE_DIR
+            ../../mvnw test
+      - run:
+          name: Generate code coverage report
+          command: |
+            echo "Checking $SERVICE service"
+            cd $SERVICE_DIR
+            ../../mvnw jacoco:report
+            echo "Coverage for $SERVICE service"
+            awk -F, \
+            '{ instructions += $4 + $5; covered += $5 } END \
+            { print covered, "/", instructions, " instructions covered"; \
+            print int(100*covered/instructions), "% covered" }' \
+            target/site/jacoco/jacoco.csv
+            cp target/surefire-reports/*.xml test-reports
+          # when: always  # Will this step run if test fails?
+      - store_test_results:
+          path: src/<<parameters.service>>/test-reports
+      - store_artifacts:
+          path: src/<<parameters.service>>/test-reports
+  python-check-style:
+    parameters:
+      service:
+        type: enum
+        enum: ["contacts", "userservice"]
+    executor: python38
+    environment:
+      SERVICE: <<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Check style
+          command: |
+            cd $SERVICE_DIR
+            pip install pylint
+            echo "Checking $SERVICE service"
+            pylint --rcfile=../../.pylintrc ./*/*.py
+  python-unit-tests:
+    parameters:
+      service:
+        type: enum
+        enum: ["contacts", "userservice"]
+    executor: python38
+    environment:
+      SERVICE: <<parameters.service>>
+      SERVICE_DIR: src/<<parameters.service>>
+    steps:
+      - checkout
+      - run:
+          name: Create directory for test reports
+          command: mkdir $SERVICE_DIR/test-reports
+      - run:
+          name: Run unit tests
+          command: |
+            cd $SERVICE_DIR
+            echo "Running tests for $SERVICE service"
+            python3 -m venv venv-$SERVICE
+            source venv-$SERVICE/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            python -m pytest --junit-xml=test-reports/report-${SERVICE}.xml -v -p no:warnings
+            deactivate
+      - run:
+          name: Generate code coverage report
+          command: |
+            cd $SERVICE_DIR
+            echo "Checking $SERVICE service"
+            python3 -m venv venv-$SERVICE
+            source venv-$SERVICE/bin/activate
+            python -m pytest --collect-only --cov-report=html:"test-reports/coverage-report.html" --cov=./ tests
+            # https://breadcrumbscollector.tech/how-to-use-code-coverage-in-python-with-pytest/
+            # pytest –cov=src/ –cov-fail-under=100 tests/
+            deactivate
+      - store_test_results:
+          path: src/<<parameters.service>>/test-reports
+      - store_artifacts:
+          path: src/<<parameters.service>>/test-reports
+  deliver-image:
+    parameters:
+      service:
+        type: string
+    executor: jdk17
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - run:
+          name: Install skaffold
+          command: |
+            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
+            sudo install skaffold /usr/local/bin/
+      - gcp-cli/install:
+          version: "402.0.0"
+      - gcp-cli/initialize
+      - gcp-gcr/gcr-auth:
+          registry-url: us-west2-docker.pkg.dev
+      - run:
+          name: Build and deliver images
+          command: |
+            skaffold config set --global local-cluster false
+            skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
+            skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
+            skaffold build --build-image=<<parameters.service>> --tag=latest
