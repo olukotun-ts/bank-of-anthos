@@ -20,7 +20,7 @@ jobs:
             src/ledgerwriter ledgerwriter true
             src/transactionhistory transactionhistory true
             src/userservice userservice true
-            .circleci frontend true
+            .circleci/* frontend true
       - run:
           name: Generate parameters
           command: python3 .circleci/generate-parameters.py
