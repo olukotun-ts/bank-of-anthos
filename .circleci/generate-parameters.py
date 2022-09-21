@@ -17,7 +17,7 @@ if os.environ.get("CIRCLE_BRANCH") == "main":
         "all-services": [*java_services, *python_services] 
     }
 else:
-    with open('filter-services.json') as f:
+    with open('.circleci/filter-services.json') as f:
         filtered = json.load(f)
 
     for service in [*filtered]:
@@ -26,7 +26,7 @@ else:
         if service in python_services:
             params.get("python-services").append(service)
 
-with open('pipeline-parameters.json', 'w') as f:
+with open('.circleci/pipeline-parameters.json', 'w') as f:
   json.dump(params, f, ensure_ascii=False)
 
 print("Generated pipeline parameters:", params)
