@@ -19,13 +19,13 @@ executors:
 parameters:
   java-services:
     type: enum
-    default: false
+    default: nil
   python-services:
     type: enum
-    default: false
+    default: nil
   all-services:
     type: enum
-    default: false
+    default: nil
 
 workflows:
   java-build-test:
