@@ -26,7 +26,8 @@ jobs:
           command: python3 .circleci/generate-parameters.py
       - continuation/continue:
           configuration_path: .circleci/continue.yml
-          parameters: .circleci/pipeline-parameters.json
+          parameters: .circleci/filter-services.json
+          # parameters: .circleci/pipeline-parameters.json
       - store_artifacts:
           path: .circleci
 
