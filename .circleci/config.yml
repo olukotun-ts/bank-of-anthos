@@ -30,25 +30,38 @@ workflows:
           requires:
             - python-check-style
       - deliver-images:
+          name: deliver-dev
           context: cloudSecrets
+          parameters:
+            tag: <<pipeline.number>>
           requires:
             - java-unit-tests
             - python-unit-tests
+      - security-scan:
+          requires: [deliver-dev]
       - deploy:
           name: deploy-dev
           context: [cloudSecrets, devCluster]
-          requires: [deliver-images]
+          requires: [security-scan]
       - slack/on-hold:
+          name: notify-qa
           context: slack
           requires:
             - deploy-dev
-      - qa-hold:
+      - qa-check:
           type: approval
           requires: [deploy-dev]
+      - deliver-images:
+          name: deliver-prod
+          context: cloudSecrets
+          parameters:
+            tag: latest
+          requires:
+            - qa-check
       - deploy:
           name: deploy-prod
           context: [cloudSecrets, prodCluster]
-          requires: [qa-hold]
+          requires: [deliver-prod]
 
 jobs:
   java-check-style:
@@ -127,6 +140,9 @@ jobs:
       - store_artifacts:
           path: test-reports
   deliver-images:
+    parameters:
+      tag:
+        type: string
     executor: jdk17
     steps:
       - setup_remote_docker:
@@ -150,7 +166,7 @@ jobs:
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --tag=$CIRCLE_SHA1   
-            skaffold build --tag=latest
+            skaffold build --tag=<<parameters.tag>>
   deploy:
     executor: jdk17
     steps:
@@ -182,3 +198,12 @@ jobs:
       - run:
           name: Get external IP
           command: kubectl --namespace $NAMESPACE get service frontend | awk '{print $4}'
+  security-scan:
+    executor: base
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - snyk/scan:
+          additional-arguments: --all-projects
+          severity-threshold: high
