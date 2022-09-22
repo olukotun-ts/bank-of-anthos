@@ -128,6 +128,8 @@ jobs:
       - run:
           name: Build and deliver images
           command: |
+            # https://github.com/AwesomeCICD/bank-of-aion/blob/main/.circleci/config.yml#L117
+            ./mvnw jib:_skaffold-fail-if-jib-out-of-date -Djib.requiredVersion=1.4.0 --projects src/ledgerwriter --also-make jib:_skaffold-files-v2 --quiet --batch-mode
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --tag=$CIRCLE_SHA1   
