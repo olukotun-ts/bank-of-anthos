@@ -6,6 +6,7 @@ orbs:
   gcp-gke: circleci/gcp-gke@1.4.0
   maven: circleci/maven@1.3.0
   slack: circleci/slack@4.10.1
+  snyk: snyk/snyk@1.2.3
 
 executors:
   base:
@@ -32,8 +33,7 @@ workflows:
       - deliver-images:
           name: deliver-dev
           context: cloudSecrets
-          parameters:
-            tag: <<pipeline.number>>
+          tag: build-<<pipeline.number>>
           requires:
             - java-unit-tests
             - python-unit-tests
@@ -54,8 +54,7 @@ workflows:
       - deliver-images:
           name: deliver-prod
           context: cloudSecrets
-          parameters:
-            tag: latest
+          tag: latest
           requires:
             - qa-check
       - deploy:
