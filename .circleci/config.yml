@@ -78,7 +78,9 @@ jobs:
       - checkout
       - run:
           name: Check style
-          command: pylint --rcfile=./.pylintrc ./src/*/*.py
+          command: |
+            pip install pylint
+            pylint --rcfile=./.pylintrc ./src/*/*.py
   python-unit-tests:
     executor: python38
     steps:
