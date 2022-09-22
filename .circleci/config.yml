@@ -22,6 +22,8 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
+      - security-scan:
+          context: cloudSecrets
       - java-check-style
       - java-unit-tests:
           requires:
@@ -33,9 +35,6 @@ workflows:
       - build-images:
           context: cloudSecrets
           tag: build-<<pipeline.number>>
-          requires: [java-unit-tests, python-unit-tests]
-      - security-scan:
-          context: cloudSecrets
           requires: [java-unit-tests, python-unit-tests]
       - deploy:
           name: deploy-dev
@@ -196,11 +195,16 @@ jobs:
           name: Get external IP
           command: kubectl --namespace $NAMESPACE get service frontend | awk '{print $4}'
   security-scan:
+    # todo:
+      # schedule scan latest prod images
+      #   on_fail: notify security-team
     executor: base
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - checkout
       - snyk/scan:
-          additional-arguments: --all-projects
+          additional-arguments: --all-projects --json-file-output=vulnerabilities.json
           severity-threshold: high
+      - store_artifacts:
+          path: vulnerabilities.json
