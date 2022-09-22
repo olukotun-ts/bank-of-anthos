@@ -1,3 +1,6 @@
+# todo:
+  # run ui tests on frontend changes
+  
 version: 2.1
 
 orbs:
@@ -6,7 +9,6 @@ orbs:
   gcp-gke: circleci/gcp-gke@1.4.0
   maven: circleci/maven@1.3.0
   slack: circleci/slack@4.10.1
-  snyk: snyk/snyk@1.2.3
 
 executors:
   base:
@@ -22,14 +24,16 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-      - security-scan:
-          context: cloudSecrets
       - java-check-style
+      - java-security-scan:
+          context: cloudSecrets
       - java-unit-tests:
-          requires: [java-check-style, security-scan]
+          requires: [java-check-style, java-security-scan]
       - python-check-style
+      - python-security-scan:
+          context: cloudSecrets
       - python-unit-tests:
-          requires: [python-check-style, security-scan]
+          requires: [python-check-style, python-security-scan]
       - build-images:
           context: cloudSecrets
           tag: build-<<pipeline.number>>
@@ -119,8 +123,8 @@ jobs:
               echo "testing $SERVICE..."
               # save current working dir to memory and cd to src/$SERVICE
               pushd src/$SERVICE
-                python3 -m venv $HOME/venv-$SERVICE
-                source $HOME/venv-$SERVICE/bin/activate
+                python3 -m venv ../../venv/$SERVICE
+                source ../../venv/$SERVICE/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 python -m pytest --junit-xml=../../test-reports/report-${SERVICE}.xml -v -p no:warnings
@@ -133,6 +137,9 @@ jobs:
           path: test-reports
       - store_artifacts:
           path: test-reports
+      - persist_to_workspace:
+          root: .
+          paths: [venv]
   build-images:
     parameters:
       tag:
@@ -192,17 +199,35 @@ jobs:
       - run:
           name: Get external IP
           command: kubectl --namespace $NAMESPACE get service frontend | awk '{print $4}'
-  security-scan:
-    # todo:
-      # schedule scan latest prod images
-      #   on_fail: notify security-team
-    executor: base
+  java-security-scan:
+    executor: jdk17
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
       - checkout
-      - snyk/scan:
-          additional-arguments: --all-projects --json-file-output=vulnerabilities.json
-          severity-threshold: high
+      - run:
+          name: Scan Java projects
+          command: |
+            mkdir vulnerabilities
+            for $SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
+              echo "Scanning $SERVICE"
+              snyk test --file=src/$SERVICE/pom.xml --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
+            done
       - store_artifacts:
-          path: vulnerabilities.json
+          path: vulnerabilities
+  python-security-scan:
+    executor: python38
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Scan Python projects
+          command: |
+            mkdir vulnerabilities
+            for $SERVICE in "contacts" "userservice"; do
+              echo "Scanning $SERVICE"
+              source venv/$SERVICE/bin/activate
+              snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
+              deactivate
+            done
+      - store_artifacts:
+          path: vulnerabilities
