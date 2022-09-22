@@ -207,7 +207,7 @@ jobs:
           name: Scan Java projects
           command: |
             mkdir vulnerabilities
-            for $SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
+            for SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
               echo "Scanning $SERVICE"
               snyk test --file=src/$SERVICE/pom.xml --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
             done
@@ -223,7 +223,7 @@ jobs:
           name: Scan Python projects
           command: |
             mkdir vulnerabilities
-            for $SERVICE in "contacts" "userservice"; do
+            for SERVICE in "contacts" "userservice"; do
               echo "Scanning $SERVICE"
               source venv/$SERVICE/bin/activate
               snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
