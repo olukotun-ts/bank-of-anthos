@@ -35,6 +35,7 @@ workflows:
           tag: build-<<pipeline.number>>
           requires: [java-unit-tests, python-unit-tests]
       - security-scan:
+          context: cloudSecrets
           requires: [java-unit-tests, python-unit-tests]
       - deploy:
           name: deploy-dev
