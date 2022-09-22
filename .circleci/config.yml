@@ -113,6 +113,8 @@ jobs:
     executor: python38
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: Create directory for test reports
           command: mkdir test-reports
@@ -123,7 +125,6 @@ jobs:
               echo "testing $SERVICE..."
               # save current working dir to memory and cd to src/$SERVICE
               pushd src/$SERVICE
-                python3 -m venv ../../venv/$SERVICE
                 source ../../venv/$SERVICE/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
@@ -137,9 +138,6 @@ jobs:
           path: test-reports
       - store_artifacts:
           path: test-reports
-      - persist_to_workspace:
-          root: .
-          paths: [venv]
   build-images:
     parameters:
       tag:
@@ -217,17 +215,22 @@ jobs:
     executor: python38
     steps:
       - checkout
-      - attach_workspace:
-          at: .
       - run:
           name: Scan Python projects
           command: |
             mkdir vulnerabilities
             for SERVICE in "contacts" "userservice"; do
-              echo "Scanning $SERVICE"
+              echo "Installing dependencies for $SERVICE"
+              python3 -m venv venv/$SERVICE
               source venv/$SERVICE/bin/activate
+              pip install --upgrade pip
+              pip install -r requirements.txt
+              echo "Scanning $SERVICE"
               snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
               deactivate
             done
       - store_artifacts:
           path: vulnerabilities
+      - persist_to_workspace:
+          root: .
+          paths: [venv]
