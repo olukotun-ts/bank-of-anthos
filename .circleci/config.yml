@@ -1,5 +1,6 @@
 # todo:
   # run ui tests on frontend changes
+  # snyk orb
   
 version: 2.1
 
@@ -202,6 +203,21 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install Snyk CLI
+          command: |
+            if [[ ! -x "/usr/local/bin/snyk" ]]; then
+              LATEST_SNYK_CLI_VERSION=$(curl https://static.snyk.io/cli/latest/version)
+              echo "Downloading Snyk CLI version ${LATEST_SNYK_CLI_VERSION}"
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux.sha256
+              sha256sum -c snyk-linux.sha256
+              sudo mv snyk-linux /usr/local/bin/snyk
+              sudo chmod +x /usr/local/bin/snyk
+            fi
+
+            snyk config set disableSuggestions=true
+            snyk auth $SNYK_TOKEN
+      - run:
           name: Scan Java projects
           command: |
             mkdir vulnerabilities
@@ -216,6 +232,21 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install Snyk CLI
+          command: |
+            if [[ ! -x "/usr/local/bin/snyk" ]]; then
+              LATEST_SNYK_CLI_VERSION=$(curl https://static.snyk.io/cli/latest/version)
+              echo "Downloading Snyk CLI version ${LATEST_SNYK_CLI_VERSION}"
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux.sha256
+              sha256sum -c snyk-linux.sha256
+              sudo mv snyk-linux /usr/local/bin/snyk
+              sudo chmod +x /usr/local/bin/snyk
+            fi
+
+            snyk config set disableSuggestions=true
+            snyk auth $SNYK_TOKEN
+      - run:
           name: Scan Python projects
           command: |
             mkdir vulnerabilities
@@ -224,7 +255,7 @@ jobs:
               python3 -m venv venv/$SERVICE
               source venv/$SERVICE/bin/activate
               pip install --upgrade pip
-              pip install -r requirements.txt
+              pip install -r src/$SERVICE/requirements.txt
               echo "Scanning $SERVICE"
               snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
               deactivate
