@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   gcp-cli: circleci/gcp-cli@2.4.1
   gcp-gcr: circleci/gcp-gcr@0.15.0
+  maven: circleci/maven@1.3.0
 
 executors:
   base:
@@ -18,174 +19,95 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-      - java-check-style:
-          name: check-style-<<matrix.service>>
-          matrix:
-            parameters:
-              service: ["balancereader", "ledgerwriter", "transactionhistory"]
+      - java-check-style
       - java-unit-tests:
-          name: test-<<matrix.service>>
-          matrix:
-            parameters:
-              service: ["balancereader", "ledgerwriter", "transactionhistory"]
-          requires:
-            - check-style-<<matrix.service>>
-      - python-check-style:
-          name: check-style-<<matrix.service>>
-          matrix:
-            parameters:
-              service: ["contacts", "userservice"]
-      - python-unit-tests:
-          name: test-<<matrix.service>>
-          matrix:
-            parameters:
-              service: ["contacts", "userservice"]
-          requires:
-            - check-style-<<matrix.service>>
-      - deliver-image:
-          name: deliver-<<matrix.service>>
-          context: cloudSecrets
-          matrix:
-            parameters:
-              service:
-                - balancereader
-                - contacts
-                - ledgerwriter
-                - transactionhistory
-                - userservice
-          requires:
-            - test-<<matrix.service>>
-      - wait:
           requires:
             - java-check-style
+      - python-check-style
+      - python-unit-tests:
+          requires:
             - python-check-style
-      - deliver-image:
-          name: deliver-<<matrix.service>>
+      - deliver-images:
           context: cloudSecrets
           requires:
-            - wait
-          matrix:
-            parameters:
-              service:
-                - accounts-db
-                - frontend
-                - ledger-db
-                - loadgenerator
+            - java-unit-tests
+            - python-unit-tests
 
 jobs:
   java-check-style:
-    parameters:
-      service:
-        type: string
     executor: jdk17
-    environment:
-      SERVICE: <<parameters.service>>
-      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Check style
-          command: |
-            echo "Checking $SERVICE service"
-            cd $SERVICE_DIR
-            ../../mvnw checkstyle:check
+          command: ./mvnw checkstyle:check
   java-unit-tests:
-    parameters:
-      service:
-        type: string
     executor: jdk17
-    environment:
-      SERVICE: <<parameters.service>>
-      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Create directory for test reports
-          command: mkdir $SERVICE_DIR/test-reports
-      - run:
-          name: Run unit tests
-          command: |
-            echo "Running tests for $SERVICE service"
-            cd $SERVICE_DIR
-            ../../mvnw test
-      - run:
-          name: Generate code coverage report
-          command: |
-            echo "Checking $SERVICE service"
-            cd $SERVICE_DIR
-            ../../mvnw jacoco:report
-            echo "Coverage for $SERVICE service"
-            awk -F, \
-            '{ instructions += $4 + $5; covered += $5 } END \
-            { print covered, "/", instructions, " instructions covered"; \
-            print int(100*covered/instructions), "% covered" }' \
-            target/site/jacoco/jacoco.csv
-            cp target/surefire-reports/*.xml test-reports
-          # when: always  # Will this step run if test fails?
+          command: mkdir test-reports
+      - maven/with_cache:
+          verify_dependencies: false    
+          steps: 
+            - run: |
+                ./mvnw test
+                for SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
+                  echo "checking $SERVICE..."
+                  # save current working dir to memory and cd to src/$SERVICE
+                  pushd src/$SERVICE
+                    ../../mvnw jacoco:report
+                    echo "Coverage for $SERVICE:"
+                    awk -F, \
+                    '{ instructions += $4 + $5; covered += $5 } END \
+                    { print covered, "/", instructions, " instructions covered"; \
+                    print int(100*covered/instructions), "% covered" }' \
+                    target/site/jacoco/jacoco.csv
+                    cp target/surefire-reports/*.xml ../../test-reports
+                  # return to previously saved path
+                  popd
+                done
       - store_test_results:
-          path: src/<<parameters.service>>/test-reports
+          path: test-reports
       - store_artifacts:
-          path: src/<<parameters.service>>/test-reports
+          path: test-reports
   python-check-style:
-    parameters:
-      service:
-        type: string
     executor: python38
-    environment:
-      SERVICE: <<parameters.service>>
-      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Check style
-          command: |
-            cd $SERVICE_DIR
-            pip install pylint
-            echo "Checking $SERVICE service"
-            pylint --rcfile=../../.pylintrc ./*/*.py
+          command: pylint --rcfile=./.pylintrc ./src/*/*.py
   python-unit-tests:
-    parameters:
-      service:
-        type: string
     executor: python38
-    environment:
-      SERVICE: <<parameters.service>>
-      SERVICE_DIR: src/<<parameters.service>>
     steps:
       - checkout
       - run:
           name: Create directory for test reports
-          command: mkdir $SERVICE_DIR/test-reports
+          command: mkdir test-reports
       - run:
           name: Run unit tests
           command: |
-            cd $SERVICE_DIR
-            echo "Running tests for $SERVICE service"
-            python3 -m venv venv-$SERVICE
-            source venv-$SERVICE/bin/activate
-            pip install --upgrade pip
-            pip install -r requirements.txt
-            python -m pytest --junit-xml=test-reports/report-${SERVICE}.xml -v -p no:warnings
-            deactivate
-      - run:
-          name: Generate code coverage report
-          command: |
-            cd $SERVICE_DIR
-            echo "Checking $SERVICE service"
-            python3 -m venv venv-$SERVICE
-            source venv-$SERVICE/bin/activate
-            python -m pytest --collect-only --cov-report=html:"test-reports/coverage-report.html" --cov=./ tests
-            # https://breadcrumbscollector.tech/how-to-use-code-coverage-in-python-with-pytest/
-            # pytest –cov=src/ –cov-fail-under=100 tests/
-            deactivate
+            for SERVICE in "contacts" "userservice"; do
+              echo "testing $SERVICE..."
+              # save current working dir to memory and cd to src/$SERVICE
+              pushd src/$SERVICE
+                python3 -m venv $HOME/venv-$SERVICE
+                source $HOME/venv-$SERVICE/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                python -m pytest --junit-xml=../../test-reports/report-${SERVICE}.xml -v -p no:warnings
+                python -m pytest --collect-only --cov-report=html:"test-reports/${SERVICE}-coverage-report.html" --cov=./ tests
+                deactivate
+              # return to previously saved path
+              popd
+            done
       - store_test_results:
-          path: src/<<parameters.service>>/test-reports
+          path: test-reports
       - store_artifacts:
-          path: src/<<parameters.service>>/test-reports
-  deliver-image:
-    parameters:
-      service:
-        type: string
+          path: test-reports
+  deliver-images:
     executor: jdk17
     steps:
       - setup_remote_docker:
@@ -206,11 +128,5 @@ jobs:
           command: |
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
-            skaffold build --build-image=<<parameters.service>> --tag=$CIRCLE_SHA1    
-            skaffold build --build-image=<<parameters.service>> --tag=latest
-  wait:
-    executor: base
-    steps:
-      - run:
-          name: Waiting for tests to complete
-          command: echo "Waiting for tests"
+            skaffold build --build-concurrency=4 --tag=$CIRCLE_SHA1   
+            skaffold build --build-concurrency=4 --tag=latest
