@@ -130,5 +130,5 @@ jobs:
           command: |
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
-            skaffold build --build-concurrency=4 --tag=$CIRCLE_SHA1   
-            skaffold build --build-concurrency=4 --tag=latest
+            skaffold build --tag=$CIRCLE_SHA1   
+            skaffold build --tag=latest
