@@ -26,12 +26,10 @@ workflows:
           context: cloudSecrets
       - java-check-style
       - java-unit-tests:
-          requires:
-            - java-check-style
+          requires: [java-check-style, security-scan]
       - python-check-style
       - python-unit-tests:
-          requires:
-            - python-check-style
+          requires: [python-check-style, security-scan]
       - build-images:
           context: cloudSecrets
           tag: build-<<pipeline.number>>
@@ -39,7 +37,7 @@ workflows:
       - deploy:
           name: deploy-dev
           context: [cloudSecrets, devCluster]
-          requires: [build-images, security-scan]
+          requires: [build-images]
       - slack/on-hold:
           name: notify-qa
           context: slack
