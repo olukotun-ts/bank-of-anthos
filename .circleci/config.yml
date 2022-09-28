@@ -1,7 +1,3 @@
-# todo:
-  # run ui tests on frontend changes
-  # snyk orb
-  
 version: 2.1
 
 orbs:
@@ -25,6 +21,7 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
+      - check-filepath
       - java-check-style
       - java-security-scan:
           context: cloudSecrets
@@ -265,3 +262,9 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: [venv]
+  check-filepath:
+    executor: base
+    steps:
+      - checkout
+      - run: cat project/.circleci/config.yml
+      
