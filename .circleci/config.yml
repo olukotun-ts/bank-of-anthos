@@ -21,34 +21,43 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
+      - check-filepath
       - java-check-style
-      - java-unit-tests:
-          requires:
-            - java-check-style
-      - python-check-style
-      - python-unit-tests:
-          requires:
-            - python-check-style
-      - deliver-images:
+      - java-security-scan:
           context: cloudSecrets
-          requires:
-            - java-unit-tests
-            - python-unit-tests
+      - java-unit-tests:
+          requires: [java-check-style, java-security-scan]
+      - python-check-style
+      - python-security-scan:
+          context: cloudSecrets
+      - python-unit-tests:
+          requires: [python-check-style, python-security-scan]
+      - build-images:
+          context: cloudSecrets
+          tag: build-<<pipeline.number>>
+          requires: [java-unit-tests, python-unit-tests]
       - deploy:
           name: deploy-dev
           context: [cloudSecrets, devCluster]
-          requires: [deliver-images]
+          requires: [build-images]
       - slack/on-hold:
+          name: notify-qa
           context: slack
           requires:
             - deploy-dev
-      - qa-hold:
+      - qa-check:
           type: approval
           requires: [deploy-dev]
+      - build-images:
+          name: tag-images
+          context: cloudSecrets
+          tag: latest
+          requires:
+            - qa-check
       - deploy:
           name: deploy-prod
           context: [cloudSecrets, prodCluster]
-          requires: [qa-hold]
+          requires: [tag-images]
 
 jobs:
   java-check-style:
@@ -102,6 +111,8 @@ jobs:
     executor: python38
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: Create directory for test reports
           command: mkdir test-reports
@@ -112,8 +123,7 @@ jobs:
               echo "testing $SERVICE..."
               # save current working dir to memory and cd to src/$SERVICE
               pushd src/$SERVICE
-                python3 -m venv $HOME/venv-$SERVICE
-                source $HOME/venv-$SERVICE/bin/activate
+                source ../../venv/$SERVICE/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 python -m pytest --junit-xml=../../test-reports/report-${SERVICE}.xml -v -p no:warnings
@@ -126,7 +136,10 @@ jobs:
           path: test-reports
       - store_artifacts:
           path: test-reports
-  deliver-images:
+  build-images:
+    parameters:
+      tag:
+        type: string
     executor: jdk17
     steps:
       - setup_remote_docker:
@@ -150,7 +163,7 @@ jobs:
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
             skaffold build --tag=$CIRCLE_SHA1   
-            skaffold build --tag=latest
+            skaffold build --tag=<<parameters.tag>>
   deploy:
     executor: jdk17
     steps:
@@ -182,3 +195,76 @@ jobs:
       - run:
           name: Get external IP
           command: kubectl --namespace $NAMESPACE get service frontend | awk '{print $4}'
+  java-security-scan:
+    executor: jdk17
+    steps:
+      - checkout
+      - run:
+          name: Install Snyk CLI
+          command: |
+            if [[ ! -x "/usr/local/bin/snyk" ]]; then
+              LATEST_SNYK_CLI_VERSION=$(curl https://static.snyk.io/cli/latest/version)
+              echo "Downloading Snyk CLI version ${LATEST_SNYK_CLI_VERSION}"
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux.sha256
+              sha256sum -c snyk-linux.sha256
+              sudo mv snyk-linux /usr/local/bin/snyk
+              sudo chmod +x /usr/local/bin/snyk
+            fi
+
+            snyk config set disableSuggestions=true
+            snyk auth $SNYK_TOKEN
+      - run:
+          name: Scan Java projects
+          command: |
+            mkdir vulnerabilities
+            for SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
+              echo "Scanning $SERVICE"
+              snyk test --file=src/$SERVICE/pom.xml --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
+            done
+      - store_artifacts:
+          path: vulnerabilities
+  python-security-scan:
+    executor: python38
+    steps:
+      - checkout
+      - run:
+          name: Install Snyk CLI
+          command: |
+            if [[ ! -x "/usr/local/bin/snyk" ]]; then
+              LATEST_SNYK_CLI_VERSION=$(curl https://static.snyk.io/cli/latest/version)
+              echo "Downloading Snyk CLI version ${LATEST_SNYK_CLI_VERSION}"
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux
+              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux.sha256
+              sha256sum -c snyk-linux.sha256
+              sudo mv snyk-linux /usr/local/bin/snyk
+              sudo chmod +x /usr/local/bin/snyk
+            fi
+
+            snyk config set disableSuggestions=true
+            snyk auth $SNYK_TOKEN
+      - run:
+          name: Scan Python projects
+          command: |
+            mkdir vulnerabilities
+            for SERVICE in "contacts" "userservice"; do
+              echo "Installing dependencies for $SERVICE"
+              python3 -m venv venv/$SERVICE
+              source venv/$SERVICE/bin/activate
+              pip install --upgrade pip
+              pip install -r src/$SERVICE/requirements.txt
+              echo "Scanning $SERVICE"
+              snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
+              deactivate
+            done
+      - store_artifacts:
+          path: vulnerabilities
+      - persist_to_workspace:
+          root: .
+          paths: [venv]
+  check-filepath:
+    executor: base
+    steps:
+      - checkout
+      - run: cat .circleci/config.yml
+      
