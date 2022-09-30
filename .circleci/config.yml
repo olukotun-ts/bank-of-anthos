@@ -266,5 +266,5 @@ jobs:
     executor: base
     steps:
       - checkout
-      - run: cat project/.circleci/config.yml
+      - run: cat .circleci/config.yml
       
