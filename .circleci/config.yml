@@ -1,3 +1,6 @@
+# Todo:
+  # use cache for venv/ instead of workspace
+
 version: 2.1
 
 orbs:
@@ -21,7 +24,6 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-      - check-filepath
       - java-check-style
       - java-security-scan:
           context: cloudSecrets
@@ -30,7 +32,13 @@ workflows:
       - python-check-style
       - python-security-scan:
           context: cloudSecrets
+          matrix:
+            parameters:
+              service: [contacts, userservice]
       - python-unit-tests:
+          matrix:
+            parameters:
+              service: [contacts, userservice]
           requires: [python-check-style, python-security-scan]
       - build-images:
           context: cloudSecrets
@@ -108,30 +116,31 @@ jobs:
             pip install pylint
             pylint --rcfile=./.pylintrc ./src/*/*.py
   python-unit-tests:
+    parameters:
+      service:
+        type: string
     executor: python38
+    parallelism: 4
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
       - run:
           name: Create directory for test reports
           command: mkdir test-reports
       - run:
           name: Run unit tests
           command: |
-            for SERVICE in "contacts" "userservice"; do
-              echo "testing $SERVICE..."
-              # save current working dir to memory and cd to src/$SERVICE
-              pushd src/$SERVICE
-                source ../../venv/$SERVICE/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                python -m pytest --junit-xml=../../test-reports/report-${SERVICE}.xml -v -p no:warnings
-                python -m pytest --collect-only --cov-report=html:"test-reports/${SERVICE}-coverage-report.html" --cov=./ tests
-                deactivate
-              # return to previously saved path
-              popd
-            done
+            cd src/<<parameters.service>>
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            TEST_FILES=$(circleci tests glob "tests/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junit-xml=test-reports/<<parameters.service>>.xml -v -p no:warnings $TEST_FILES
+            deactivate
+      - save_cache:
+          key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
+          paths: [src/<<parameters.service>>/venv]
       - store_test_results:
           path: test-reports
       - store_artifacts:
@@ -225,6 +234,9 @@ jobs:
       - store_artifacts:
           path: vulnerabilities
   python-security-scan:
+    parameters:
+      service:
+        type: string
     executor: python38
     steps:
       - checkout
@@ -243,28 +255,23 @@ jobs:
 
             snyk config set disableSuggestions=true
             snyk auth $SNYK_TOKEN
+      - restore_cache:
+          key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
       - run:
           name: Scan Python projects
           command: |
+            cd src/<<parameters.service>>
             mkdir vulnerabilities
-            for SERVICE in "contacts" "userservice"; do
-              echo "Installing dependencies for $SERVICE"
-              python3 -m venv venv/$SERVICE
-              source venv/$SERVICE/bin/activate
-              pip install --upgrade pip
-              pip install -r src/$SERVICE/requirements.txt
-              echo "Scanning $SERVICE"
-              snyk test --file=src/$SERVICE/requirements.txt --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
-              deactivate
-            done
+            echo "Installing dependencies for <<parameters.service>>"
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            echo "Scanning <<parameters.service>>"
+            snyk test --file=requirements.txt --json-file-output=vulnerabilities/<<parameters.service>>.json --severity-threshold=high 
+            deactivate
+      - save_cache:
+          key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
+          paths: [src/<<parameters.service>>/venv]
       - store_artifacts:
-          path: vulnerabilities
-      - persist_to_workspace:
-          root: .
-          paths: [venv]
-  check-filepath:
-    executor: base
-    steps:
-      - checkout
-      - run: cat .circleci/config.yml
-      
+          path: src/<<parameters.service>>/vulnerabilities
