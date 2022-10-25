@@ -136,7 +136,7 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
             TEST_FILES=$(circleci tests glob "tests/test_*.py" | circleci tests split --split-by=timings)
-            pytest --junit-xml=test-reports/<<parameters.service>>.xml -v -p no:warnings $TEST_FILES
+            python -m pytest --junit-xml=test-reports/<<parameters.service>>.xml -v -p no:warnings $TEST_FILES
             deactivate
       - save_cache:
           key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
