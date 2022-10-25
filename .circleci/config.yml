@@ -142,9 +142,9 @@ jobs:
           key: venv-<<parameters.service>>-{{ checksum "src/<<parameters.service>>/requirements.txt" }}
           paths: [src/<<parameters.service>>/venv]
       - store_test_results:
-          path: test-reports
+          path: src/<<parameters.service>>/test-reports
       - store_artifacts:
-          path: test-reports
+          path: src/<<parameters.service>>/test-reports
   build-images:
     parameters:
       tag:
