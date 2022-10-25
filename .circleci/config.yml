@@ -14,12 +14,15 @@ executors:
   base:
     docker:
       - image: cimg/base:stable
+    resource_class: medium
   jdk17:
     docker:
       - image: cimg/openjdk:17.0.3
+    resource_class: medium
   python38:
     docker:
       - image: cimg/python:3.8
+    resource_class: medium
 
 workflows:
   build-test-deliver:
@@ -70,6 +73,7 @@ workflows:
 jobs:
   java-check-style:
     executor: jdk17
+    resource_class: small
     steps:
       - checkout
       - run:
@@ -108,6 +112,7 @@ jobs:
           path: test-reports
   python-check-style:
     executor: python38
+    resource_class: small
     steps:
       - checkout
       - run:
@@ -150,6 +155,7 @@ jobs:
       tag:
         type: string
     executor: jdk17
+    resource_class: large
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
@@ -175,6 +181,7 @@ jobs:
             skaffold build --tag=<<parameters.tag>>
   deploy:
     executor: jdk17
+    resource_class: small
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
