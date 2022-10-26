@@ -82,7 +82,7 @@ jobs:
       - run:
           environment:
             AWS_ROLE_ARN: 'arn:aws:iam::483285841698:role/olukotun-oidc-demo'
-            ECR_IMAGE: 483285841698.dkr.ecr.us-east-1.amazonaws.com/olukotun-demo  # Image repository
+            ECR_REPO: 483285841698.dkr.ecr.us-east-1.amazonaws.com/olukotun-demo  # Image repository
             IMAGE_NAME: olukotun-demo-image
           name: Build and push Docker image to AWS ECR using OIDC Protocol
           command: |
@@ -101,11 +101,11 @@ jobs:
             export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 
             # Login to AWS ECR
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_IMAGE
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO
             # Build image locally
-            docker build -t ${ECR_IMAGE}/${IMAGE_NAME}:${CIRCLE_WORKFLOW_ID} ./src/contacts
+            docker build -t $ECR_REPO/$IMAGE_NAME:$CIRCLE_WORKFLOW_ID ./src/contacts
             # Push image to ECR
-            docker push ${ECR_IMAGE}/${IMAGE_NAME}:${CIRCLE_WORKFLOW_ID}
+            docker push $ECR_REPO/$IMAGE_NAME:$CIRCLE_WORKFLOW_ID
   java-check-style:
     executor: jdk17
     resource_class: small
