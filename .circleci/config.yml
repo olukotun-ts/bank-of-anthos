@@ -76,33 +76,33 @@ jobs:
     executor: base
     steps:
       - run:
-        environment:
-          AWS_ROLE_ARN: 'arn:aws:iam::483285841698:role/olukotun-oidc-demo'
-          ECR_IMAGE: 483285841698.dkr.ecr.us-east-1.amazonaws.com/olukotun-demo  # Image repository
-        name: Build and push Docker image to AWS ECR using OIDC Protocol
-        command: |
-          # Install AWS CLI
-          sudo apt-get update
-          sudo apt-get install awscli
-          # use the OpenID Connect token to obtain AWS credentials
-          read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \<<< \
-            $(aws sts assume-role-with-web-identity \
-            --role-arn ${AWS_ROLE_ARN} \
-            --role-session-name "CircleCI-${CIRCLE_WORKFLOW_ID}-${CIRCLE_JOB}" \
-            --web-identity-token $CIRCLE_OIDC_TOKEN \
-            --duration-seconds 3600 \
-            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-            --output text)
-          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-          echo AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-          # Login to AWS ECR
-          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $ECR_IMAGE
-          # # Build image locally
-          # docker build -t ${DOCKER_LOGIN}/${IMAGE_NAME}:${TAG_VERSION} .
-          # # Tag image in ECR
-          # docker tag ${DOCKER_LOGIN}/${IMAGE_NAME}:${TAG_VERSION} $ECR_IMAGE:$TAG_VERSION
-          # # Push image to ECR
-          # docker push $ECR_IMAGE:$TAG_VERSION
+          environment:
+            AWS_ROLE_ARN: 'arn:aws:iam::483285841698:role/olukotun-oidc-demo'
+            ECR_IMAGE: 483285841698.dkr.ecr.us-east-1.amazonaws.com/olukotun-demo  # Image repository
+          name: Build and push Docker image to AWS ECR using OIDC Protocol
+          command: |
+            # Install AWS CLI
+            sudo apt-get update
+            sudo apt-get install awscli
+            # use the OpenID Connect token to obtain AWS credentials
+            read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \<<< \
+              $(aws sts assume-role-with-web-identity \
+              --role-arn ${AWS_ROLE_ARN} \
+              --role-session-name "CircleCI-${CIRCLE_WORKFLOW_ID}-${CIRCLE_JOB}" \
+              --web-identity-token $CIRCLE_OIDC_TOKEN \
+              --duration-seconds 3600 \
+              --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+              --output text)
+            export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+            echo AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+            # Login to AWS ECR
+            aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $ECR_IMAGE
+            # # Build image locally
+            # docker build -t ${DOCKER_LOGIN}/${IMAGE_NAME}:${TAG_VERSION} .
+            # # Tag image in ECR
+            # docker tag ${DOCKER_LOGIN}/${IMAGE_NAME}:${TAG_VERSION} $ECR_IMAGE:$TAG_VERSION
+            # # Push image to ECR
+            # docker push $ECR_IMAGE:$TAG_VERSION
   java-check-style:
     executor: jdk17
     resource_class: small
