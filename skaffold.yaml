@@ -105,3 +105,21 @@ deploy:
     manifests:
     - dev-kubernetes-manifests/loadgenerator.yaml
 # [END gke_bank_of_anthos_skaffold_config_loadgenerator]
+---
+apiVersion: skaffold/v2beta18
+kind: Config
+metadata:
+  name: java-services # module defining backend services
+requires:
+  - configs: [db]
+build:
+  artifacts:
+  - image: ledgerwriter
+    jib:
+      project: src/ledgerwriter
+  - image: balancereader
+    jib:
+      project: src/balancereader
+  - image: transactionhistory
+    jib:
+      project: src/transactionhistory
