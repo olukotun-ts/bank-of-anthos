@@ -95,8 +95,7 @@ jobs:
               --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
               --output text)
             # export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-            # echo AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-            aws sts --no-cli-pager get-caller-identity 
+            echo $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY $AWS_SESSION_TOKEN
 
             # Login to AWS ECR
             # aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_IMAGE
