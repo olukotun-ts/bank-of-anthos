@@ -66,9 +66,9 @@ workflows:
             parameters:
               service: [contacts, userservice]
           # requires: [qa-check]
-      - build-java:
-          context: cloudSecrets
-          tag: latest
+      # - build-java:
+      #     context: cloudSecrets
+      #     tag: latest
           # requires: [qa-check]
       # - deploy:
       #     name: deploy-prod
@@ -116,7 +116,7 @@ jobs:
       - aws-ecr/build-and-push-image:
           assume-web-identity: true
           path: src/<<parameters.service>>
-          registry-id: $AWS_ACCOUNT_ID
+          registry-id: AWS_ACCOUNT_ID
           role-arn: $AWS_ROLE_ARN
           session-duration: 900
           skip-when-tags-exist: true
@@ -253,7 +253,7 @@ jobs:
             sudo install skaffold /usr/local/bin/
       - aws-ecr/ecr-login:
           assume-web-identity: true
-          registry-id: $AWS_ACCOUNT_ID
+          registry-id: AWS_ACCOUNT_ID
           role-arn: $AWS_ROLE_ARN
           session-duration: 900
       - run:
