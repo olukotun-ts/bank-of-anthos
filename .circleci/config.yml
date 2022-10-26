@@ -28,52 +28,52 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-      - java-check-style
-      - java-security-scan:
-          context: cloudSecrets
-      - java-unit-tests:
-          requires: [java-check-style, java-security-scan]
-      - python-check-style
-      - python-security-scan:
-          context: cloudSecrets
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-      - python-unit-tests:
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          requires: [python-check-style, python-security-scan]
-      - build-all:
-          context: cloudSecrets
-          tag: build-<<pipeline.number>>
-          requires: [java-unit-tests, python-unit-tests]
-      - deploy:
-          name: deploy-dev
-          context: [cloudSecrets, devCluster]
-          requires: [build-all]
-      - slack/on-hold:
-          name: notify-qa
-          context: slack
-          requires: [deploy-dev]
-      - qa-check:
-          type: approval
-          requires: [deploy-dev]
+      # - java-check-style
+      # - java-security-scan:
+      #     context: cloudSecrets
+      # - java-unit-tests:
+      #     requires: [java-check-style, java-security-scan]
+      # - python-check-style
+      # - python-security-scan:
+      #     context: cloudSecrets
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      # - python-unit-tests:
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      #     requires: [python-check-style, python-security-scan]
+      # - build-all:
+      #     context: cloudSecrets
+      #     tag: build-<<pipeline.number>>
+      #     requires: [java-unit-tests, python-unit-tests]
+      # - deploy:
+      #     name: deploy-dev
+      #     context: [cloudSecrets, devCluster]
+      #     requires: [build-all]
+      # - slack/on-hold:
+      #     name: notify-qa
+      #     context: slack
+      #     requires: [deploy-dev]
+      # - qa-check:
+      #     type: approval
+      #     requires: [deploy-dev]
       - build-python:
           name: build
           context: cloudSecrets
           matrix:
             parameters:
               service: [contacts, userservice]
-          requires: [qa-check]
+          # requires: [qa-check]
       - build-java:
           context: cloudSecrets
           tag: latest
-          requires: [qa-check]
-      - deploy:
-          name: deploy-prod
-          context: [cloudSecrets, prodCluster]
-          requires: [build-python, build-java]
+          # requires: [qa-check]
+      # - deploy:
+      #     name: deploy-prod
+      #     context: [cloudSecrets, prodCluster]
+      #     requires: [build-python, build-java]
 
 jobs:
   build-python:
@@ -82,7 +82,7 @@ jobs:
         type: string
     executor: aws-ecr/default
     environment:
-      AWS_ECR_REGISTRY_ID: 483285841698
+      AWS_ACCOUNT_ID: 483285841698
       AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
       ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
     steps:
@@ -205,6 +205,10 @@ jobs:
       tag:
         type: string
     executor: jdk17
+    environment:
+      AWS_ACCOUNT_ID: 483285841698
+      AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
+      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
     resource_class: large
     steps:
       - setup_remote_docker:
@@ -233,6 +237,10 @@ jobs:
       tag:
         type: string
     executor: jdk17
+    environment:
+      AWS_ACCOUNT_ID: 483285841698
+      AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
+      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
     resource_class: large
     steps:
       - setup_remote_docker:
