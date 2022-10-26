@@ -118,7 +118,7 @@ jobs:
           path: src/<<parameters.service>>
           registry-id: AWS_ACCOUNT_ID
           role-arn: $AWS_ROLE_ARN
-          session-duration: 900
+          session-duration: "900"
           skip-when-tags-exist: true
           tag: build-<<pipeline.number>>
   java-check-style:
@@ -223,7 +223,7 @@ jobs:
           assume-web-identity: true
           registry-id: $AWS_ACCOUNT_ID
           role-arn: $AWS_ROLE_ARN
-          session-duration: 900
+          session-duration: "900"
       - run:
           name: Build and deliver images
           command: |
@@ -255,7 +255,7 @@ jobs:
           assume-web-identity: true
           registry-id: AWS_ACCOUNT_ID
           role-arn: $AWS_ROLE_ARN
-          session-duration: 900
+          session-duration: "900"
       - run:
           name: Build and deliver images
           command: |
