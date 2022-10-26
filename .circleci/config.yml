@@ -76,6 +76,7 @@ jobs:
   test-oidc:
     executor: base
     steps:
+      - checkout
       - run:
           environment:
             AWS_ROLE_ARN: 'arn:aws:iam::483285841698:role/olukotun-oidc-demo'
