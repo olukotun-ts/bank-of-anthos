@@ -117,6 +117,7 @@ jobs:
           assume-web-identity: true
           path: src/<<parameters.service>>
           registry-id: AWS_ACCOUNT_ID
+          repo: $ECR_REPO
           role-arn: $AWS_ROLE_ARN
           session-duration: "900"
           skip-when-tags-exist: true
