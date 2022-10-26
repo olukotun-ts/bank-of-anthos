@@ -44,14 +44,14 @@ workflows:
             parameters:
               service: [contacts, userservice]
           requires: [python-check-style, python-security-scan]
-      - build-images:
+      - build-all:
           context: cloudSecrets
           tag: build-<<pipeline.number>>
           requires: [java-unit-tests, python-unit-tests]
       - deploy:
           name: deploy-dev
           context: [cloudSecrets, devCluster]
-          requires: [build-images]
+          requires: [build-all]
       - slack/on-hold:
           name: notify-qa
           context: slack
@@ -200,6 +200,34 @@ jobs:
           path: src/<<parameters.service>>/test-reports
       - store_artifacts:
           path: src/<<parameters.service>>/test-reports
+  build-all:
+    parameters:
+      tag:
+        type: string
+    executor: jdk17
+    resource_class: large
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - run:
+          name: Install skaffold
+          command: |
+            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
+            sudo install skaffold /usr/local/bin/
+      - aws-ecr/ecr-login:
+          assume-web-identity: true
+          registry-id: $AWS_ACCOUNT_ID
+          role-arn: $AWS_ROLE_ARN
+          session-duration: 900
+      - run:
+          name: Build and deliver images
+          command: |
+            # https://github.com/AwesomeCICD/bank-of-aion/blob/main/.circleci/config.yml#L117
+            ./mvnw jib:_skaffold-fail-if-jib-out-of-date -Djib.requiredVersion=1.4.0 --projects src/ledgerwriter --also-make jib:_skaffold-files-v2 --quiet --batch-mode
+            skaffold config set --global local-cluster false
+            skaffold config set --global default-repo $ECR_REPO
+            skaffold build --tag=build-<<pipeline.number>>
   build-java:
     parameters:
       tag:
@@ -253,7 +281,7 @@ jobs:
           command: |
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
-            skaffold deploy --kubeconfig=$HOME/.kube/config --namespace=$NAMESPACE --tag=$CIRCLE_SHA1
+            skaffold deploy --kubeconfig=$HOME/.kube/config --namespace=$NAMESPACE --tag=build-<<pipeline.number>>
       - run:
           name: Wait for frontend
           command: kubectl --namespace $NAMESPACE wait --for condition=Available=True --timeout=300s deployment/frontend
