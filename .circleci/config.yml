@@ -69,7 +69,8 @@ workflows:
           name: deploy-prod
           context: [cloudSecrets, prodCluster]
           requires: [tag-images]
-      - test-oidc
+      - test-oidc:
+          context: [cloudSecrets]
 
 jobs:
   test-oidc:
