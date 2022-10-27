@@ -33,25 +33,28 @@ workflows:
       #     context: cloudSecrets
       # - java-unit-tests:
       #     requires: [java-check-style, java-security-scan]
-      # - python-check-style
-      # - python-security-scan:
-      #     context: cloudSecrets
-      #     matrix:
-      #       parameters:
-      #         service: [contacts, userservice]
-      # - python-unit-tests:
-      #     matrix:
-      #       parameters:
-      #         service: [contacts, userservice]
-      #     requires: [python-check-style, python-security-scan]
-      # - build-all:
-      #     context: cloudSecrets
-      #     tag: build-<<pipeline.number>>
-      #     requires: [java-unit-tests, python-unit-tests]
-      # - deploy:
-      #     name: deploy-dev
-      #     context: [cloudSecrets, devCluster]
-      #     requires: [build-all]
+      - python-check-style
+      - python-security-scan:
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: [contacts, userservice]
+      - python-unit-tests:
+          matrix:
+            parameters:
+              service: [contacts, userservice]
+          requires: [python-check-style, python-security-scan]
+      - python-build:
+          name: build-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: [contacts, userservice]
+          requires: [qa-check]
+      - deploy:
+          name: deploy-dev
+          context: [cloudSecrets, devCluster]
+          requires: [python-build]
       # - slack/on-hold:
       #     name: notify-qa
       #     context: slack
@@ -59,24 +62,17 @@ workflows:
       # - qa-check:
       #     type: approval
       #     requires: [deploy-dev]
-      - build-python:
-          name: build-<<matrix.service>>
-          context: cloudSecrets
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          # requires: [qa-check]
-      # - build-java:
+      # - java-build:
       #     context: cloudSecrets
       #     tag: latest
           # requires: [qa-check]
       # - deploy:
       #     name: deploy-prod
       #     context: [cloudSecrets, prodCluster]
-      #     requires: [build-python, build-java]
+      #     requires: [python-build, java-build]
 
 jobs:
-  build-python:
+  python-build:
     parameters:
       service:
         type: string
@@ -84,11 +80,17 @@ jobs:
     environment:
       AWS_ACCOUNT_ID: 483285841698
       AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
-      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
+      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
+      - aws-ecr/ecr-login:
+          assume-web-identity: true
+          registry-id: AWS_ACCOUNT_ID
+          repo: $ECR_REPO
+          role-arn: $AWS_ROLE_ARN
+          session-duration: "900"
       - run:
           name: Build and push Docker image to AWS ECR using OIDC Protocol
           command: |
@@ -112,15 +114,6 @@ jobs:
             docker build -t $ECR_REPO:<<parameters.service>>-<<pipeline.number>> src/<<parameters.service>>
             # Push image to ECR
             docker push $ECR_REPO:<<parameters.service>>-<<pipeline.number>>
-      # - aws-ecr/build-and-push-image:
-      #     assume-web-identity: true
-      #     path: src/<<parameters.service>>
-      #     registry-id: AWS_ACCOUNT_ID
-      #     repo: $ECR_REPO
-      #     role-arn: $AWS_ROLE_ARN
-      #     session-duration: "900"
-      #     skip-when-tags-exist: true
-      #     tag: build-<<pipeline.number>>
   java-check-style:
     executor: jdk17
     resource_class: small
@@ -232,7 +225,7 @@ jobs:
             skaffold config set --global local-cluster false
             skaffold config set --global default-repo $ECR_REPO
             skaffold build --tag=build-<<pipeline.number>>
-  build-java:
+  java-build:
     parameters:
       tag:
         type: string
