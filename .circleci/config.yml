@@ -48,7 +48,7 @@ workflows:
           requires: [python-check-style, python-security-scan]
       - python-build:
           name: build-<<matrix.service>>
-          context: cloudSecrets
+          context: [aws, cloudSecrets]
           tag: <<matrix.service>>-<<pipeline.number>>
           matrix:
             parameters:
