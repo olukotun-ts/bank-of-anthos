@@ -105,7 +105,7 @@ jobs:
           role-arn: $AWS_ROLE_ARN
       - aws-eks/update-kubeconfig-with-authenticator:
           cluster-authentication-role-arn: $CLUSTER_IAM_ROLE_ARN
-          cluster-name: $CLUSTER_ARN
+          cluster-name: cera-solutions-eng
           install-kubectl: true
       - run:
           name: Deploy service
