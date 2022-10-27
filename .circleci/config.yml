@@ -102,6 +102,7 @@ jobs:
     steps:
       - checkout
       - aws-cli/setup:
+          aws-region: AWS_REGION
           role-arn: $AWS_ROLE_ARN
       - aws-eks/update-kubeconfig-with-authenticator:
           cluster-authentication-role-arn: $CLUSTER_IAM_ROLE_ARN
