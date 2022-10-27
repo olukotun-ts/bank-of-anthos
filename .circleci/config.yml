@@ -102,7 +102,7 @@ jobs:
           path: src/<<parameters.service>>/test-reports
       - store_artifacts:
           path: src/<<parameters.service>>/test-reports
-    python-security-scan:
+  python-security-scan:
     parameters:
       service:
         type: string
