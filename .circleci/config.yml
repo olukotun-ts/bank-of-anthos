@@ -88,7 +88,6 @@ jobs:
       - aws-ecr/ecr-login:
           assume-web-identity: true
           registry-id: AWS_ACCOUNT_ID
-          repo: $ECR_REPO
           role-arn: $AWS_ROLE_ARN
           session-duration: "900"
       - run:
