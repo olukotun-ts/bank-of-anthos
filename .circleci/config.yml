@@ -93,6 +93,7 @@ jobs:
         type: string
     executor: aws-ecr/default
     steps:
+      - checkout
       - aws-ecr/ecr-login:
           assume-web-identity: true
           registry-id: AWS_ACCOUNT_ID
