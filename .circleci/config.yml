@@ -111,6 +111,7 @@ jobs:
         type: string
     executor: aws-ecr/default
     steps:
+      - checkout
       - aws-eks/update-kubeconfig-with-authenticator:
           cluster-authentication-role-arn: $AWS_ROLE_ARN
           cluster-name: cera-solutions-eng
