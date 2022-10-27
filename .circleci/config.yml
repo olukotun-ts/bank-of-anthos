@@ -1,13 +1,8 @@
-# Todo:
-  # use cache for venv/ instead of workspace
-
 version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@3.1.3
   aws-ecr: circleci/aws-ecr@8.1.3
-  aws-eks: circleci/aws-eks@2.2.0
-  kubernetes: circleci/kubernetes@1.3.1
   maven: circleci/maven@1.3.0
   slack: circleci/slack@4.10.1
 
@@ -15,10 +10,6 @@ executors:
   base:
     docker:
       - image: cimg/base:stable
-    resource_class: medium
-  jdk17:
-    docker:
-      - image: cimg/openjdk:17.0.3
     resource_class: medium
   python38:
     docker:
@@ -28,19 +19,19 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-    #   - python-check-style
-    #   - python-security-scan:
-    #       name: scan-<<matrix.service>>
-    #       context: cloudSecrets
-    #       matrix:
-    #         parameters:
-    #           service: [contacts, userservice]
-    #   - python-unit-tests:
-    #       name: test-<<matrix.service>>
-    #       matrix:
-    #         parameters:
-    #           service: [contacts, userservice]
-    #       requires: [python-check-style, scan-<<matrix.service>>]
+      - python-check-style
+      - python-security-scan:
+          name: scan-<<matrix.service>>
+          context: cloudSecrets
+          matrix:
+            parameters:
+              service: [contacts, userservice]
+      - python-unit-tests:
+          name: test-<<matrix.service>>
+          matrix:
+            parameters:
+              service: [contacts, userservice]
+          requires: [python-check-style, scan-<<matrix.service>>]
       - python-build:
           name: build-<<matrix.service>>
           context: [aws, cloudSecrets]
@@ -48,30 +39,7 @@ workflows:
           matrix:
             parameters:
               service: [contacts, userservice]
-          # requires: [test-<<matrix.service>>]
-      - python-deploy:
-          name: deploy-dev-<<matrix.service>>
-          context: [aws, aws-dev-cluster, cloudSecrets]
-          namespace: boa-dev
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-      #     requires: [build-<<matrix.service>>]
-      # - slack/on-hold:
-      #     name: notify-qa
-      #     context: slack
-      #     requires: [deploy-dev]
-      # - qa-check:
-      #     type: approval
-      #     requires: [deploy-dev]
-      # - python-build:
-      #     name: tag-<<matrix.service>>
-      #     context: cloudSecrets
-      #     tag: latest
-      #     matrix:
-      #       parameters:
-      #         service: [contacts, userservice]
-      #     requires: [qa-check]
+          requires: [test-<<matrix.service>>]
 
 jobs:
   python-build:
@@ -93,65 +61,7 @@ jobs:
           command: |
             docker build -t $ECR_REPO:<<parameters.tag>> src/<<parameters.service>>
             docker push $ECR_REPO:<<parameters.tag>>
-  python-deploy:
-    parameters:
-      service:
-        type: string
-      namespace:
-        type: string
-    executor: aws-cli/default
-    steps:
-      - checkout
-      - kubernetes/install
-      - aws-cli/setup:
-          aws-region: AWS_REGION
-          role-arn: $AWS_ROLE_ARN
-      - run: 
-          name: Update kubeconfig
-          command: aws eks update-kubeconfig --name cera-solutions-eng
-      - run:
-          name: Deploy service
-          command: |
-            kubectl apply -f dev-kubernetes-manifests/<<parameters.service>>.yaml -n <<parameters.namespace>>
-  java-check-style:
-    executor: jdk17
-    resource_class: small
-    steps:
-      - checkout
-      - run:
-          name: Check style
-          command: ./mvnw checkstyle:check
-  java-unit-tests:
-    executor: jdk17
-    steps:
-      - checkout
-      - run:
-          name: Create directory for test reports
-          command: mkdir test-reports
-      - maven/with_cache:
-          verify_dependencies: false    
-          steps: 
-            - run: |
-                ./mvnw test
-                for SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
-                  echo "checking $SERVICE..."
-                  # save current working dir to memory and cd to src/$SERVICE
-                  pushd src/$SERVICE
-                    ../../mvnw jacoco:report
-                    echo "Coverage for $SERVICE:"
-                    awk -F, \
-                    '{ instructions += $4 + $5; covered += $5 } END \
-                    { print covered, "/", instructions, " instructions covered"; \
-                    print int(100*covered/instructions), "% covered" }' \
-                    target/site/jacoco/jacoco.csv
-                    cp target/surefire-reports/*.xml ../../test-reports
-                  # return to previously saved path
-                  popd
-                done
-      - store_test_results:
-          path: test-reports
-      - store_artifacts:
-          path: test-reports
+      - slack/notify
   python-check-style:
     executor: python38
     resource_class: small
@@ -192,132 +102,7 @@ jobs:
           path: src/<<parameters.service>>/test-reports
       - store_artifacts:
           path: src/<<parameters.service>>/test-reports
-  build-all:
-    parameters:
-      tag:
-        type: string
-    executor: jdk17
-    environment:
-      AWS_ACCOUNT_ID: 483285841698
-      AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
-      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
-    resource_class: large
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - run:
-          name: Install skaffold
-          command: |
-            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
-            sudo install skaffold /usr/local/bin/
-      - aws-ecr/ecr-login:
-          assume-web-identity: true
-          registry-id: $AWS_ACCOUNT_ID
-          role-arn: $AWS_ROLE_ARN
-          session-duration: "900"
-      - run:
-          name: Build and deliver images
-          command: |
-            # https://github.com/AwesomeCICD/bank-of-aion/blob/main/.circleci/config.yml#L117
-            ./mvnw jib:_skaffold-fail-if-jib-out-of-date -Djib.requiredVersion=1.4.0 --projects src/ledgerwriter --also-make jib:_skaffold-files-v2 --quiet --batch-mode
-            skaffold config set --global local-cluster false
-            skaffold config set --global default-repo $ECR_REPO
-            skaffold build --tag=build-<<pipeline.number>>
-  java-build:
-    parameters:
-      tag:
-        type: string
-    executor: jdk17
-    environment:
-      AWS_ACCOUNT_ID: 483285841698
-      AWS_ROLE_ARN: arn:aws:iam::483285841698:role/olukotun-oidc-demo
-      ECR_REPO: 483285841698.dkr.ecr.us-west-2.amazonaws.com/olukotun-boa-contacts
-    resource_class: large
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - run:
-          name: Install skaffold
-          command: |
-            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
-            sudo install skaffold /usr/local/bin/
-      - aws-ecr/ecr-login:
-          assume-web-identity: true
-          registry-id: AWS_ACCOUNT_ID
-          role-arn: $AWS_ROLE_ARN
-          session-duration: "900"
-      - run:
-          name: Build and deliver images
-          command: |
-            # https://github.com/AwesomeCICD/bank-of-aion/blob/main/.circleci/config.yml#L117
-            ./mvnw jib:_skaffold-fail-if-jib-out-of-date -Djib.requiredVersion=1.4.0 --projects src/ledgerwriter --also-make jib:_skaffold-files-v2 --quiet --batch-mode
-            skaffold config set --global local-cluster false
-            skaffold config set --global default-repo $ECR_REPO
-            skaffold build --module=java-services --tag=build-<<pipeline.number>>
-  deploy:
-    executor: jdk17
-    resource_class: small
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - run:
-          name: Install skaffold
-          command: |
-            curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
-            sudo install skaffold /usr/local/bin/
-      - gcp-cli/install:
-          version: "402.0.0"
-      - gcp-cli/initialize
-      - gcp-gcr/gcr-auth:
-          registry-url: us-west2-docker.pkg.dev
-      - gcp-gke/install
-      - gcp-gke/update-kubeconfig-with-credentials:
-          cluster: $CLUSTER
-      - run:
-          name: Deploy images
-          command: |
-            skaffold config set --global local-cluster false
-            skaffold config set --global default-repo us-west2-docker.pkg.dev/olukotun-demo/boa
-            skaffold deploy --kubeconfig=$HOME/.kube/config --namespace=$NAMESPACE --tag=build-<<pipeline.number>>
-      - run:
-          name: Wait for frontend
-          command: kubectl --namespace $NAMESPACE wait --for condition=Available=True --timeout=300s deployment/frontend
-      - run:
-          name: Get external IP
-          command: kubectl --namespace $NAMESPACE get service frontend | awk '{print $4}'
-  java-security-scan:
-    executor: jdk17
-    steps:
-      - checkout
-      - run:
-          name: Install Snyk CLI
-          command: |
-            if [[ ! -x "/usr/local/bin/snyk" ]]; then
-              LATEST_SNYK_CLI_VERSION=$(curl https://static.snyk.io/cli/latest/version)
-              echo "Downloading Snyk CLI version ${LATEST_SNYK_CLI_VERSION}"
-              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux
-              curl -sO --retry 6 https://static.snyk.io/cli/v${LATEST_SNYK_CLI_VERSION}/snyk-linux.sha256
-              sha256sum -c snyk-linux.sha256
-              sudo mv snyk-linux /usr/local/bin/snyk
-              sudo chmod +x /usr/local/bin/snyk
-            fi
-
-            snyk config set disableSuggestions=true
-            snyk auth $SNYK_TOKEN
-      - run:
-          name: Scan Java projects
-          command: |
-            mkdir vulnerabilities
-            for SERVICE in "balancereader" "ledgerwriter" "transactionhistory"; do
-              echo "Scanning $SERVICE"
-              snyk test --file=src/$SERVICE/pom.xml --json-file-output=vulnerabilities/$SERVICE.json --severity-threshold=high 
-            done
-      - store_artifacts:
-          path: vulnerabilities
-  python-security-scan:
+    python-security-scan:
     parameters:
       service:
         type: string
