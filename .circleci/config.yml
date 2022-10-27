@@ -25,20 +25,20 @@ executors:
 
 workflows:
   build-test-deliver:
-    jobs:
-      - python-check-style
-      - python-security-scan:
-          name: scan-<<matrix.service>>
-          context: cloudSecrets
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-      - python-unit-tests:
-          name: test-<<matrix.service>>
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          requires: [python-check-style, scan-<<matrix.service>>]
+    # jobs:
+    #   - python-check-style
+    #   - python-security-scan:
+    #       name: scan-<<matrix.service>>
+    #       context: cloudSecrets
+    #       matrix:
+    #         parameters:
+    #           service: [contacts, userservice]
+    #   - python-unit-tests:
+    #       name: test-<<matrix.service>>
+    #       matrix:
+    #         parameters:
+    #           service: [contacts, userservice]
+    #       requires: [python-check-style, scan-<<matrix.service>>]
       - python-build:
           name: build-<<matrix.service>>
           context: [aws, cloudSecrets]
@@ -46,30 +46,30 @@ workflows:
           matrix:
             parameters:
               service: [contacts, userservice]
-          requires: [test-<<matrix.service>>]
+          # requires: [test-<<matrix.service>>]
       - python-deploy:
           name: deploy-dev-<<matrix.service>>
-          context: [aws-dev-cluster, cloudSecrets]
+          context: [aws, aws-dev-cluster, cloudSecrets]
           namespace: boa-dev
           matrix:
             parameters:
               service: [contacts, userservice]
-          requires: [build-<<matrix.service>>]
-      - slack/on-hold:
-          name: notify-qa
-          context: slack
-          requires: [deploy-dev]
-      - qa-check:
-          type: approval
-          requires: [deploy-dev]
-      - python-build:
-          name: tag-<<matrix.service>>
-          context: cloudSecrets
-          tag: latest
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          requires: [qa-check]
+      #     requires: [build-<<matrix.service>>]
+      # - slack/on-hold:
+      #     name: notify-qa
+      #     context: slack
+      #     requires: [deploy-dev]
+      # - qa-check:
+      #     type: approval
+      #     requires: [deploy-dev]
+      # - python-build:
+      #     name: tag-<<matrix.service>>
+      #     context: cloudSecrets
+      #     tag: latest
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      #     requires: [qa-check]
 
 jobs:
   python-build:
