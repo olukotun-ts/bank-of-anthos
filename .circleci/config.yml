@@ -35,11 +35,13 @@ workflows:
       #     requires: [java-check-style, java-security-scan]
       - python-check-style
       - python-security-scan:
+          name: scan-<<matrix.service>>
           context: cloudSecrets
           matrix:
             parameters:
               service: [contacts, userservice]
       - python-unit-tests:
+          name: test-<<matrix.service>>
           matrix:
             parameters:
               service: [contacts, userservice]
@@ -47,14 +49,14 @@ workflows:
       - python-build:
           name: build-<<matrix.service>>
           context: cloudSecrets
+          tag: <<matrix.service>>-<<pipeline.number>>
           matrix:
             parameters:
               service: [contacts, userservice]
-          requires: [qa-check]
-      - deploy:
-          name: deploy-dev
-          context: [cloudSecrets, devCluster]
-          requires: [python-build]
+      # - deploy:
+      #     name: deploy-dev
+      #     context: [cloudSecrets, devCluster]
+      #     requires: [python-build]
       # - slack/on-hold:
       #     name: notify-qa
       #     context: slack
@@ -62,6 +64,14 @@ workflows:
       # - qa-check:
       #     type: approval
       #     requires: [deploy-dev]
+      # - python-build:
+      #     name: tag-<<matrix.service>>
+      #     context: cloudSecrets
+      #     tag: latest
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      #     requires: [qa-check]
       # - java-build:
       #     context: cloudSecrets
       #     tag: latest
@@ -75,6 +85,8 @@ jobs:
   python-build:
     parameters:
       service:
+        type: string
+      tag:
         type: string
     executor: base
     environment:
@@ -110,9 +122,9 @@ jobs:
             # Login to AWS ECR
             aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $ECR_REPO
             # Build image locally
-            docker build -t $ECR_REPO:<<parameters.service>>-<<pipeline.number>> src/<<parameters.service>>
+            docker build -t $ECR_REPO:<<parameters.tag>> src/<<parameters.service>>
             # Push image to ECR
-            docker push $ECR_REPO:<<parameters.service>>-<<pipeline.number>>
+            docker push $ECR_REPO:<<parameters.tag>>
   java-check-style:
     executor: jdk17
     resource_class: small
