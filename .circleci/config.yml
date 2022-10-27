@@ -53,17 +53,18 @@ workflows:
           matrix:
             parameters:
               service: [contacts, userservice]
-      - deploy:
-          name: deploy-dev
-          context: [cloudSecrets, devCluster]
-          requires: [python-build]
-      - slack/on-hold:
-          name: notify-qa
-          context: slack
-          requires: [deploy-dev]
-      - qa-check:
-          type: approval
-          requires: [deploy-dev]
+          requires: [python-unit-tests]
+      # - deploy:
+      #     name: deploy-dev
+      #     context: [cloudSecrets, devCluster]
+      #     requires: [python-build]
+      # - slack/on-hold:
+      #     name: notify-qa
+      #     context: slack
+      #     requires: [deploy-dev]
+      # - qa-check:
+      #     type: approval
+      #     requires: [deploy-dev]
       # - python-build:
       #     name: tag-<<matrix.service>>
       #     context: cloudSecrets
@@ -98,6 +99,11 @@ jobs:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
+      - aws-ecr/ecr-login:
+          assume-web-identity: true
+          registry-id: AWS_ACCOUNT_ID
+          role-arn: $AWS_ROLE_ARN
+          session-duration: "900"
       - run:
           name: Build and push Docker image to AWS ECR using OIDC Protocol
           command: |
