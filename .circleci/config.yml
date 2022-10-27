@@ -3,14 +3,9 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@3.1.3
   aws-ecr: circleci/aws-ecr@8.1.3
-  maven: circleci/maven@1.3.0
   slack: circleci/slack@4.10.1
 
 executors:
-  base:
-    docker:
-      - image: cimg/base:stable
-    resource_class: medium
   python38:
     docker:
       - image: cimg/python:3.8
@@ -61,6 +56,7 @@ jobs:
           command: |
             docker build -t $ECR_REPO:<<parameters.tag>> src/<<parameters.service>>
             docker push $ECR_REPO:<<parameters.tag>>
+            exit 1
       - slack/notify
   python-check-style:
     executor: python38
