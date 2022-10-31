@@ -39,7 +39,7 @@ workflows:
       - aws-eks/create-cluster:
           name: create-cluster
           context: [aws]
-          requires: [python-build]
+          # requires: [python-build]
           pre-steps:
             - aws-cli/setup:
                 role-arn: $AWS_ROLE_ARN
