@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@3.1.3
   aws-ecr: circleci/aws-ecr@8.1.3
+  aws-eks: circleci/aws-eks@2.2.0
   slack: circleci/slack@4.10.1
 
 executors:
@@ -35,6 +36,27 @@ workflows:
             parameters:
               service: [contacts, userservice]
           requires: [test-<<matrix.service>>]
+      - aws-eks/create-cluster:
+          name: create-cluster
+          context: [aws]
+          requires: [python-build]
+          pre-steps:
+            - aws-cli/setup:
+                role-arn: $AWS_ROLE_ARN
+          aws-region: $AWS_REGION
+          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
+      - uat:
+          type: approval
+          requires: create-cluster
+      - aws-eks/delete-cluster:
+          name: delete-cluster
+          context: [aws]
+          requires: [uat]
+          pre-steps:
+            - aws-cli/setup:
+                role-arn: $AWS_ROLE_ARN
+          aws-region: $AWS_REGION
+          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
 
 jobs:
   python-build:
