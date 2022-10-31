@@ -15,27 +15,27 @@ executors:
 workflows:
   build-test-deliver:
     jobs:
-      - python-check-style
-      - python-security-scan:
-          name: scan-<<matrix.service>>
-          context: cloudSecrets
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-      - python-unit-tests:
-          name: test-<<matrix.service>>
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          requires: [python-check-style, scan-<<matrix.service>>]
-      - python-build:
-          name: build-<<matrix.service>>
-          context: [aws, cloudSecrets, slack]
-          tag: <<matrix.service>>-<<pipeline.number>>
-          matrix:
-            parameters:
-              service: [contacts, userservice]
-          requires: [test-<<matrix.service>>]
+      # - python-check-style
+      # - python-security-scan:
+      #     name: scan-<<matrix.service>>
+      #     context: cloudSecrets
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      # - python-unit-tests:
+      #     name: test-<<matrix.service>>
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      #     requires: [python-check-style, scan-<<matrix.service>>]
+      # - python-build:
+      #     name: build-<<matrix.service>>
+      #     context: [aws, cloudSecrets, slack]
+      #     tag: <<matrix.service>>-<<pipeline.number>>
+      #     matrix:
+      #       parameters:
+      #         service: [contacts, userservice]
+      #     requires: [test-<<matrix.service>>]
       - aws-eks/create-cluster:
           name: create-cluster
           context: [aws]
@@ -78,7 +78,6 @@ jobs:
           command: |
             docker build -t $ECR_REPO:<<parameters.tag>> src/<<parameters.service>>
             docker push $ECR_REPO:<<parameters.tag>>
-            exit 1
       - slack/notify
   python-check-style:
     executor: python38
