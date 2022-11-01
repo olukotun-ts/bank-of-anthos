@@ -36,29 +36,51 @@ workflows:
       #       parameters:
       #         service: [contacts, userservice]
       #     requires: [test-<<matrix.service>>]
-      - aws-eks/create-cluster:
-          name: create-cluster
-          context: [aws]
-          # requires: [python-build]
-          pre-steps:
-            - aws-cli/setup:
-                role-arn: $AWS_ROLE_ARN
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
-      - uat:
-          type: approval
-          requires: [create-cluster]
-      - aws-eks/delete-cluster:
-          name: delete-cluster
-          context: [aws]
-          requires: [uat]
-          pre-steps:
-            - aws-cli/setup:
-                role-arn: $AWS_ROLE_ARN
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
+
+
+      # Debug using commands; create nodegroup manually
+      # - aws-eks/create-cluster:
+      #     name: create-cluster
+      #     context: [aws]
+      #     # requires: [python-build]
+      #     pre-steps:
+      #       - aws-cli/setup:
+      #           role-arn: $AWS_ROLE_ARN
+      #     aws-region: $AWS_REGION
+      #     cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
+      - create-cluster
+      - create-cluster-ng
+      # - uat:
+      #     type: approval
+      #     requires: [create-cluster]
+      # - aws-eks/delete-cluster:
+      #     name: delete-cluster
+      #     context: [aws]
+      #     requires: [uat]
+      #     pre-steps:
+      #       - aws-cli/setup:
+      #           role-arn: $AWS_ROLE_ARN
+      #     aws-region: $AWS_REGION
+      #     cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
 
 jobs:
+  create-cluster-ng:
+    executor: aws-ecr/default
+    steps:
+      - aws-cli/setup:
+          role-arn: $AWS_ROLE_ARN
+      - aws-eks/create-cluster:
+          aws-region: $AWS_REGION
+          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-ng # Not required? What happens if blank?
+  create-cluster:
+    executor: aws-ecr/default
+    steps:
+      - aws-cli/setup:
+          role-arn: $AWS_ROLE_ARN
+      - aws-eks/create-cluster:
+          aws-region: $AWS_REGION
+          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
+          without-nodegroup: true
   python-build:
     parameters:
       service:
