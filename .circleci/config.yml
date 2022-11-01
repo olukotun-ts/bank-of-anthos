@@ -48,8 +48,10 @@ workflows:
       #           role-arn: $AWS_ROLE_ARN
       #     aws-region: $AWS_REGION
       #     cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
-      - create-cluster
-      - create-cluster-ng
+      - create-cluster:
+          context: aws
+      - create-cluster-ng:
+          context: aws
       # - uat:
       #     type: approval
       #     requires: [create-cluster]
