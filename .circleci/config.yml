@@ -4,6 +4,7 @@ orbs:
   aws-cli: circleci/aws-cli@3.1.3
   aws-ecr: circleci/aws-ecr@8.1.3
   aws-eks: circleci/aws-eks@2.2.0
+  k8s: circleci/kubernetes@1.3.1
   slack: circleci/slack@4.10.1
 
 executors:
@@ -67,21 +68,27 @@ jobs:
 # ctx:
   # - use cera
   # - scope permissions
-  # - redo assume role local
-  # - do assume role ssh 
-  # - why does create-cluster fail?
+  # - restore SolutionsEngineeringEKS role
+      # - https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_multi-value-conditions.html#reference_policies_multi-key-or-value-conditions
+  # - why does aws-eks/create-cluster fail?
+  # - why does aws-eks/update-kubeconfig-with-authenticator fail
+      # - https://app.circleci.com/pipelines/github/olukotun-ts/bank-of-anthos/150/workflows/a24ea535-322d-45b7-8974-ffa93e39234e/jobs/1115
 
 
   connect-cluster:
     executor: aws-ecr/default
     steps:
       - aws-cli/setup:
+          aws-region: $AWS_REGION
           role-arn: $AWS_ROLE_ARN
-      - aws-eks/update-kubeconfig-with-authenticator:
-          cluster-authentication-role-arn: $AWS_ROLE_ARN
-          cluster-name: $CLUSTER_NAME
-          install-kubectl: true
-      - run: kubectl get ns
+      - aws-cli/assume-role-with-web-identity:
+          role-arn: $AWS_ROLE_ARN
+      - k8s/install-kubectl
+      - run:
+          name: Connect to cluster
+          command: |
+            aws eks update-kubeconfig --name $CLUSTER_NAME
+            kubectl get ns
   python-build:
     parameters:
       service:
