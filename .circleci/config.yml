@@ -48,10 +48,8 @@ workflows:
       #           role-arn: $AWS_ROLE_ARN
       #     aws-region: $AWS_REGION
       #     cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
-      - create-cluster:
-          context: aws
-      - create-cluster-ng:
-          context: aws
+      - connect-cluster:
+          context: [aws, cera]
       # - uat:
       #     type: approval
       #     requires: [create-cluster]
@@ -66,31 +64,24 @@ workflows:
       #     cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
 
 jobs:
-  create-cluster-ng:
+# ctx:
+  # - use cera
+  # - scope permissions
+  # - redo assume role local
+  # - do assume role ssh 
+  # - why does create-cluster fail?
+
+
+  connect-cluster:
     executor: aws-ecr/default
     steps:
       - aws-cli/setup:
           role-arn: $AWS_ROLE_ARN
-      - aws-eks/create-cluster:
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-$CIRCLE_BUILD_NUM-ng # Not required? What happens if blank?
-      - run:
-          name: Delete cluster
-          when: on_fail
-          command: eksctl delete cluster --name $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-$CIRCLE_BUILD_NUM-ng
-  create-cluster:
-    executor: aws-ecr/default
-    steps:
-      - aws-cli/setup:
-          role-arn: $AWS_ROLE_ARN
-      - aws-eks/create-cluster:
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-$CIRCLE_BUILD_NUM # Not required? What happens if blank?
-          without-nodegroup: true
-      - run:
-          name: Delete cluster
-          when: on_fail
-          command: eksctl delete cluster --name $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-$CIRCLE_BUILD_NUM
+      - aws-eks/update-kubeconfig-with-authenticator:
+          cluster-authentication-role-arn: $AWS_ROLE_ARN
+          cluster-name: $CLUSTER_NAME
+          install-kubectl: true
+      - run: kubectl get ns
   python-build:
     parameters:
       service:
