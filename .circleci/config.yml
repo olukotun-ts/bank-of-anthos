@@ -69,7 +69,7 @@ jobs:
   create-cluster-ng:
     executor: aws-ecr/default
     environment:
-      CLUSTER_NAME: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME
+      CLUSTER_NAME: ${CIRCLE_PROJECT_REPONAME}-${CIRCLE_USERNAME}
     steps:
       - aws-cli/setup:
           role-arn: $AWS_ROLE_ARN
