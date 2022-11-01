@@ -68,16 +68,18 @@ workflows:
 jobs:
   create-cluster-ng:
     executor: aws-ecr/default
+    environment:
+      CLUSTER_NAME: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME
     steps:
       - aws-cli/setup:
           role-arn: $AWS_ROLE_ARN
       - aws-eks/create-cluster:
           aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-ng # Not required? What happens if blank?
-      - aws-eks/delete-cluster:
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME-ng
+          cluster-name: $CLUSTER_NAME-ng # Not required? What happens if blank?
+      - run:
+          name: Delete cluster
           when: on_fail
+          command: eksctl delete cluster --name $CLUSTER_NAME
   create-cluster:
     executor: aws-ecr/default
     steps:
@@ -85,14 +87,12 @@ jobs:
           role-arn: $AWS_ROLE_ARN
       - aws-eks/create-cluster:
           aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME # Not required? What happens if blank?
+          cluster-name: $CLUSTER_NAME # Not required? What happens if blank?
           without-nodegroup: true
-      - aws-eks/delete-cluster:
-          aws-region: $AWS_REGION
-          cluster-name: $CIRCLE_PROJECT_REPONAME-$CIRCLE_USERNAME
+      - run:
+          name: Delete cluster
           when: on_fail
-
-      
+          command: eksctl delete cluster --name $CLUSTER_NAME
   python-build:
     parameters:
       service:
