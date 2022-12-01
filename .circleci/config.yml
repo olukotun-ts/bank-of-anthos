@@ -40,6 +40,20 @@ workflows:
             parameters:
               service: [contacts, userservice]
           requires: [test-<<matrix.service>>]
+      - approve-staging:
+          type: approval
+          requires: [python-build]
+      - python-deploy:
+          name: deploy-staging
+          context: [aws, aws-staging]
+          requires: [approve-staging]
+      - approve-prod:
+          type: approval
+          requires: [deploy-staging]
+      - python-deploy:
+          name: deploy-prod
+          context: [aws, aws-prod]
+          requires: [approve-prod]
 
 jobs:
   python-build:
@@ -144,3 +158,10 @@ jobs:
           paths: [src/<<parameters.service>>/venv]
       - store_artifacts:
           path: src/<<parameters.service>>/vulnerabilities
+  python-deploy:
+    executor: python38
+    steps:
+      - checkout
+      - run:
+          name: Deploy service
+          command: echo 'Deploying built services'
